@@ -34,7 +34,7 @@ require_root() {
 }
 
 ensure_scripts_present() {
-  local required=(ssl-renewal lib.sh deploy-certs.sh telegram-notify.sh node-prep.sh node-nginx-patch.sh disable-renew-on-nodes.sh)
+  local required=(ssl-renewal lib.sh deploy-certs.sh activate-certs-on-node.sh telegram-notify.sh node-prep.sh node-nginx-patch.sh disable-renew-on-nodes.sh)
   for f in "${required[@]}"; do
     [[ -f "${REPO_SCRIPTS_DIR}/${f}" ]] || die "Missing required file: ${REPO_SCRIPTS_DIR}/${f}"
   done
@@ -266,6 +266,12 @@ LOG_DIR="${APP_DIR}/logs"
 TELEGRAM_ENABLED="${telegram_enabled}"
 TELEGRAM_BOT_TOKEN="${bot_token}"
 TELEGRAM_CHAT_ID="${chat_id}"
+SSH_CONNECT_TIMEOUT="10"
+SSH_COMMAND_TIMEOUT="60"
+DEPLOY_RETRIES="3"
+DEPLOY_RETRY_DELAY="5"
+MIN_CERT_VALIDITY_SECONDS="86400"
+DEPLOY_LOCK_FILE="/run/lock/ssl-renewal-deploy.lock"
 EOF2
   chmod 600 "${ETC_DIR}/config.env"
 }
@@ -291,6 +297,7 @@ install_runtime_files() {
   install -m 755 "${REPO_SCRIPTS_DIR}/ssl-renewal" "${APP_DIR}/ssl-renewal"
   install -m 755 "${REPO_SCRIPTS_DIR}/lib.sh" "${APP_DIR}/lib.sh"
   install -m 755 "${REPO_SCRIPTS_DIR}/deploy-certs.sh" "${APP_DIR}/deploy-certs.sh"
+  install -m 755 "${REPO_SCRIPTS_DIR}/activate-certs-on-node.sh" "${APP_DIR}/activate-certs-on-node.sh"
   install -m 755 "${REPO_SCRIPTS_DIR}/telegram-notify.sh" "${APP_DIR}/telegram-notify.sh"
   install -m 755 "${REPO_SCRIPTS_DIR}/node-prep.sh" "${APP_DIR}/node-prep.sh"
   install -m 755 "${REPO_SCRIPTS_DIR}/node-nginx-patch.sh" "${APP_DIR}/node-nginx-patch.sh"
@@ -514,3 +521,4 @@ main() {
 }
 
 main "$@"
+
