@@ -22,6 +22,11 @@ DEPLOY_RETRIES="${DEPLOY_RETRIES:-3}"
 DEPLOY_RETRY_DELAY="${DEPLOY_RETRY_DELAY:-5}"
 MIN_CERT_VALIDITY_SECONDS="${MIN_CERT_VALIDITY_SECONDS:-86400}"
 LOCK_FILE="${DEPLOY_LOCK_FILE:-/run/lock/ssl-renewal-deploy.lock}"
+SSH_IDENTITY_FILE="${SSH_IDENTITY_FILE:-}"
+TARGET_CERT_FILE="${TARGET_CERT_FILE:-fullchain.pem}"
+TARGET_KEY_FILE="${TARGET_KEY_FILE:-privkey.pem}"
+NGINX_MODE="${NGINX_MODE:-systemd}"
+NGINX_CONTAINER="${NGINX_CONTAINER:-}"
 
 is_positive_integer() { [[ "$1" =~ ^[1-9][0-9]*$ ]]; }
 is_positive_integer "$SSH_CONNECT_TIMEOUT" || { echo "Invalid SSH_CONNECT_TIMEOUT" >&2; exit 1; }
@@ -31,6 +36,15 @@ is_positive_integer "$DEPLOY_RETRY_DELAY" || { echo "Invalid DEPLOY_RETRY_DELAY"
 is_positive_integer "$MIN_CERT_VALIDITY_SECONDS" || { echo "Invalid MIN_CERT_VALIDITY_SECONDS" >&2; exit 1; }
 [[ "$TARGET_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "Unsafe TARGET_DIR: ${TARGET_DIR}" >&2; exit 1; }
 [[ "$PRIMARY_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "Invalid PRIMARY_DOMAIN: ${PRIMARY_DOMAIN}" >&2; exit 1; }
+[[ "$TARGET_CERT_FILE" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Invalid TARGET_CERT_FILE" >&2; exit 1; }
+[[ "$TARGET_KEY_FILE" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Invalid TARGET_KEY_FILE" >&2; exit 1; }
+[[ "$NGINX_MODE" == systemd || "$NGINX_MODE" == docker ]] || { echo "Invalid NGINX_MODE" >&2; exit 1; }
+if [[ "$NGINX_MODE" == docker ]]; then
+  [[ "$NGINX_CONTAINER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Invalid NGINX_CONTAINER" >&2; exit 1; }
+fi
+if [[ -n "$SSH_IDENTITY_FILE" ]]; then
+  [[ -f "$SSH_IDENTITY_FILE" ]] || { echo "SSH identity not found: ${SSH_IDENTITY_FILE}" >&2; exit 1; }
+fi
 
 mkdir -p "${LOG_DIR}" "$(dirname "$LOCK_FILE")"
 LOG_FILE="${LOG_DIR}/deploy-certs.log"
@@ -59,6 +73,9 @@ private_key_hash="$(openssl pkey -in "${CERT_DIR}/privkey.pem" -pubout -outform 
 [[ -n "$cert_key_hash" && "$cert_key_hash" == "$private_key_hash" ]] || { log "Local certificate and private key do not match"; exit 1; }
 
 SSH_OPTIONS=(-o BatchMode=yes -o "ConnectTimeout=${SSH_CONNECT_TIMEOUT}" -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
+if [[ -n "$SSH_IDENTITY_FILE" ]]; then
+  SSH_OPTIONS=(-i "$SSH_IDENTITY_FILE" -o IdentitiesOnly=yes "${SSH_OPTIONS[@]}")
+fi
 
 retry() {
   local attempt=1
@@ -108,7 +125,7 @@ while IFS= read -r NODE || [[ -n "$NODE" ]]; do
 
   # The helper validates the candidate and restores the previous pair if the
   # nginx validation or reload fails.
-  if ! run_ssh "$NODE" "bash '${remote_stage}/activate-certs-on-node.sh' '${TARGET_DIR}' '${remote_stage}' '${PRIMARY_DOMAIN}' '${MIN_CERT_VALIDITY_SECONDS}'"; then
+  if ! run_ssh "$NODE" "bash '${remote_stage}/activate-certs-on-node.sh' '${TARGET_DIR}' '${remote_stage}' '${PRIMARY_DOMAIN}' '${MIN_CERT_VALIDITY_SECONDS}' '${TARGET_CERT_FILE}' '${TARGET_KEY_FILE}' '${NGINX_MODE}' '${NGINX_CONTAINER}'"; then
     log "ERROR: validation/activation failed on ${NODE}; previous certificate restored"
     FAIL_NODES+=("$NODE")
     continue
