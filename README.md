@@ -341,6 +341,32 @@ ssl-renewal cleanup-legacy-hooks
 4. Node validates `nginx -t` before reload
 5. Optional Telegram message sent with success/failure summary
 
+### Safe deployment behavior
+
+Certificate deployment is serialized with `flock`, uses bounded SSH/SCP calls,
+and retries transient failures. Each node receives the candidate files in a
+private staging directory. Before activation the node verifies:
+
+- the certificate is parseable and is valid for at least 24 more hours;
+- the certificate covers `PRIMARY_DOMAIN`;
+- the certificate public key matches `privkey.pem`.
+
+The current pair is copied to `TARGET_DIR/.ssl-renewal-backups/` before the
+candidate is installed. If `nginx -t` or the reload fails, the previous pair is
+restored and Nginx is reloaded with it. Backups are intentionally retained for
+manual recovery.
+
+The following optional values in `/etc/ssl-renewal/config.env` tune deployment:
+
+```bash
+SSH_CONNECT_TIMEOUT="10"
+SSH_COMMAND_TIMEOUT="60"
+DEPLOY_RETRIES="3"
+DEPLOY_RETRY_DELAY="5"
+MIN_CERT_VALIDITY_SECONDS="86400"
+DEPLOY_LOCK_FILE="/run/lock/ssl-renewal-deploy.lock"
+```
+
 ---
 
 ## First-run checklist
@@ -371,3 +397,4 @@ See `docs/TROUBLESHOOTING.md`.
 ## Upgrade / rollback / uninstall
 
 See `docs/OPERATIONS.md`.
+
