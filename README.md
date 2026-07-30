@@ -367,6 +367,23 @@ MIN_CERT_VALIDITY_SECONDS="86400"
 DEPLOY_LOCK_FILE="/run/lock/ssl-renewal-deploy.lock"
 ```
 
+Docker-based node Nginx is supported. For example, when the host directory
+`/opt/nginx-selfsteal/ssl` is mounted read-only at `/etc/nginx/ssl` inside the
+`nginx-selfsteal` container, use:
+
+```bash
+SSH_IDENTITY_FILE="/root/.ssh/ssl_renewal_ed25519"
+TARGET_DIR="/opt/nginx-selfsteal/ssl"
+TARGET_CERT_FILE="fullchain.crt"
+TARGET_KEY_FILE="private.key"
+NGINX_MODE="docker"
+NGINX_CONTAINER="nginx-selfsteal"
+```
+
+The deployment writes through the host bind mount, validates with
+`docker exec <container> nginx -t`, and performs a graceful
+`docker exec <container> nginx -s reload`. Other containers are not restarted.
+
 ---
 
 ## First-run checklist
