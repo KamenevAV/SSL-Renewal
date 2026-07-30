@@ -81,3 +81,22 @@ On a specific node:
 3. Remove config: `/etc/ssl-renewal`
 4. Optionally remove certbot deploy hook:
    `/etc/letsencrypt/renewal-hooks/deploy/ssl-renewal-deploy.sh`
+# Deployment recovery
+
+Every successful activation attempt first saves the previous node certificate
+pair below:
+
+```text
+<TARGET_DIR>/.ssl-renewal-backups/<timestamp>-<pid>/
+```
+
+Failed Nginx validation or reload triggers an automatic rollback. If manual
+recovery is ever needed, copy both `fullchain.pem` and `privkey.pem` from the
+same backup directory to `TARGET_DIR`, then run:
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+Do not mix a certificate from one backup with a private key from another.
+
