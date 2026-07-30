@@ -35,7 +35,7 @@ for marker in 'flock -n' 'ConnectTimeout=' 'MIN_CERT_VALIDITY_SECONDS' 'activate
   [[ "$deploy_source" == *"$marker"* ]] || { echo "deploy-certs.sh missing safeguard: $marker" >&2; exit 1; }
 done
 activate_source="$(< scripts/activate-certs-on-node.sh)"
-for marker in 'ssl-renewal-backups' 'Activation failed; restoring previous certificate' 'nginx -t' 'openssl x509' 'openssl pkey'; do
+for marker in 'ssl-renewal-backups' 'Activation failed; restoring previous certificate' 'nginx -t' 'openssl x509' 'openssl pkey' 'docker exec' 'nginx_mode'; do
   [[ "$activate_source" == *"$marker"* ]] || { echo "activate-certs-on-node.sh missing safeguard: $marker" >&2; exit 1; }
 done
 
