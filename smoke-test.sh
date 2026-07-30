@@ -29,6 +29,16 @@ echo "Checking multi-domain configuration support..."
 [[ "$(< install.sh)" == *"EXTRA_DOMAINS_CSV"* ]] || { echo "install.sh missing EXTRA_DOMAINS_CSV" >&2; exit 1; }
 [[ "$(< scripts/lib.sh)" == *"EXTRA_DOMAINS_CSV"* ]] || { echo "scripts/lib.sh missing EXTRA_DOMAINS_CSV" >&2; exit 1; }
 
+echo "Checking hardened deployment safeguards..."
+deploy_source="$(< scripts/deploy-certs.sh)"
+for marker in 'flock -n' 'ConnectTimeout=' 'MIN_CERT_VALIDITY_SECONDS' 'activate-certs-on-node.sh' 'openssl x509' 'openssl pkey'; do
+  [[ "$deploy_source" == *"$marker"* ]] || { echo "deploy-certs.sh missing safeguard: $marker" >&2; exit 1; }
+done
+activate_source="$(< scripts/activate-certs-on-node.sh)"
+for marker in 'ssl-renewal-backups' 'Activation failed; restoring previous certificate' 'nginx -t' 'openssl x509' 'openssl pkey' 'docker exec' 'nginx_mode'; do
+  [[ "$activate_source" == *"$marker"* ]] || { echo "activate-certs-on-node.sh missing safeguard: $marker" >&2; exit 1; }
+done
+
 echo "Checking executable bits..."
 for f in install.sh smoke-test.sh scripts/*.sh scripts/ssl-renewal bootstrap.sh; do
   [[ -x "$f" ]] || echo "  WARN: not executable: $f"
@@ -46,3 +56,4 @@ else
 fi
 
 echo "Smoke test finished."
+

@@ -5,7 +5,7 @@ load_config() {
   [[ -f "$cfg" ]] || { echo "Config not found: $cfg" >&2; return 1; }
   # shellcheck disable=SC1090
   source "$cfg"
-  export ROLE APP_DIR ETC_DIR PRIMARY_DOMAIN EXTRA_DOMAINS_CSV TARGET_DIR CERT_DIR LOG_DIR TELEGRAM_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID NODES_FILE DNS_PROPAGATION_SECONDS CLOUDFLARE_CREDENTIALS REGION_WILDCARDS_CSV
+  export ROLE APP_DIR ETC_DIR PRIMARY_DOMAIN EXTRA_DOMAINS_CSV TARGET_DIR TARGET_CERT_FILE TARGET_KEY_FILE CERT_DIR LOG_DIR TELEGRAM_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID NODES_FILE DNS_PROPAGATION_SECONDS CLOUDFLARE_CREDENTIALS REGION_WILDCARDS_CSV SSH_IDENTITY_FILE SSH_CONNECT_TIMEOUT SSH_COMMAND_TIMEOUT DEPLOY_RETRIES DEPLOY_RETRY_DELAY MIN_CERT_VALIDITY_SECONDS DEPLOY_LOCK_FILE NGINX_MODE NGINX_CONTAINER
 }
 
 banner() {
@@ -71,6 +71,9 @@ EOF2
 doctor_main() {
   local ok=1
   command -v certbot >/dev/null 2>&1 || { log "certbot not found"; ok=0; }
+  command -v flock >/dev/null 2>&1 || { log "flock not found"; ok=0; }
+  command -v timeout >/dev/null 2>&1 || { log "timeout not found"; ok=0; }
+  command -v openssl >/dev/null 2>&1 || { log "openssl not found"; ok=0; }
   certbot plugins 2>/dev/null | grep -q dns-cloudflare || { log "dns-cloudflare plugin not found"; ok=0; }
   [[ -f "${CERT_DIR}/fullchain.pem" ]] || { log "Missing ${CERT_DIR}/fullchain.pem"; ok=0; }
   [[ -f "${CERT_DIR}/privkey.pem" ]] || { log "Missing ${CERT_DIR}/privkey.pem"; ok=0; }
@@ -190,3 +193,4 @@ cleanup_legacy_hooks() {
 
   echo "Legacy cleanup complete. Backup directory: ${backup_dir}"
 }
+

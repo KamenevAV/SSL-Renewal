@@ -341,6 +341,49 @@ ssl-renewal cleanup-legacy-hooks
 4. Node validates `nginx -t` before reload
 5. Optional Telegram message sent with success/failure summary
 
+### Safe deployment behavior
+
+Certificate deployment is serialized with `flock`, uses bounded SSH/SCP calls,
+and retries transient failures. Each node receives the candidate files in a
+private staging directory. Before activation the node verifies:
+
+- the certificate is parseable and is valid for at least 24 more hours;
+- the certificate covers `PRIMARY_DOMAIN`;
+- the certificate public key matches `privkey.pem`.
+
+The current pair is copied to `TARGET_DIR/.ssl-renewal-backups/` before the
+candidate is installed. If `nginx -t` or the reload fails, the previous pair is
+restored and Nginx is reloaded with it. Backups are intentionally retained for
+manual recovery.
+
+The following optional values in `/etc/ssl-renewal/config.env` tune deployment:
+
+```bash
+SSH_CONNECT_TIMEOUT="10"
+SSH_COMMAND_TIMEOUT="60"
+DEPLOY_RETRIES="3"
+DEPLOY_RETRY_DELAY="5"
+MIN_CERT_VALIDITY_SECONDS="86400"
+DEPLOY_LOCK_FILE="/run/lock/ssl-renewal-deploy.lock"
+```
+
+Docker-based node Nginx is supported. For example, when the host directory
+`/opt/nginx-selfsteal/ssl` is mounted read-only at `/etc/nginx/ssl` inside the
+`nginx-selfsteal` container, use:
+
+```bash
+SSH_IDENTITY_FILE="/root/.ssh/ssl_renewal_ed25519"
+TARGET_DIR="/opt/nginx-selfsteal/ssl"
+TARGET_CERT_FILE="fullchain.crt"
+TARGET_KEY_FILE="private.key"
+NGINX_MODE="docker"
+NGINX_CONTAINER="nginx-selfsteal"
+```
+
+The deployment writes through the host bind mount, validates with
+`docker exec <container> nginx -t`, and performs a graceful
+`docker exec <container> nginx -s reload`. Other containers are not restarted.
+
 ---
 
 ## First-run checklist
@@ -371,3 +414,4 @@ See `docs/TROUBLESHOOTING.md`.
 ## Upgrade / rollback / uninstall
 
 See `docs/OPERATIONS.md`.
+
